@@ -1,7 +1,7 @@
 import * as THREE from "./node_modules/three/build/three.module.js";
 
 let renderer, scene, canvas, camera, sizes, particles, texture, geometry;
-let toogleAnimate = false;
+let toggleAnimate = false;
 let imagedata;
 const centerVector = new THREE.Vector3(0, 0, 0);
 
@@ -63,31 +63,30 @@ function getParticleTexture() {
 let textureLink = document.querySelector(".bg-texture").getAttribute("data-image");
 
 /* Function to get image data for pixel manipulation */
-function getImageData(image) {
+function getImageData(image, scaleFactor = 0.7) {
+  // Create a canvas for processing
   const imgCanvas = document.createElement("canvas");
-  imgCanvas.width = image.width;
-  imgCanvas.height = image.height;
+  imgCanvas.width = Math.round(image.width * scaleFactor);
+  imgCanvas.height = Math.round(image.height * scaleFactor);
 
   const ctx = imgCanvas.getContext("2d");
-  ctx.drawImage(image, 0, 0);
+  ctx.drawImage(image, 0, 0, imgCanvas.width, imgCanvas.height);
 
-  return ctx.getImageData(0, 0, image.width, image.height);
+  // Get reduced pixel data
+  return ctx.getImageData(0, 0, imgCanvas.width, imgCanvas.height);
 }
 
-/* Draw objects based on image data
----------------------------------------------------------------*/
-function drawObject() {
-  geometry = new THREE.BufferGeometry();
-
+function createGeometryFromImageData(imagedata) {
   const initialPositions = [];
   const vertices = [];
   const destinations = [];
   const velocities = [];
 
-  // Generate particles based on image data
   for (let h = 0; h < imagedata.height; h++) {
     for (let w = 0; w < imagedata.width; w++) {
-      if (imagedata.data[w * 4 + h * 4 * imagedata.width + 3] > 128) {
+      const alpha = imagedata.data[(w + h * imagedata.width) * 4 + 3];
+      if (alpha > 128) {
+        // Only process visible pixels
         // Initial random positions
         const x = THREE.MathUtils.randFloatSpread(1000);
         const y = THREE.MathUtils.randFloatSpread(1000);
@@ -96,7 +95,7 @@ function drawObject() {
         vertices.push(x, y, z);
         initialPositions.push(x, y, z);
 
-        // Destination positions based on image pixels
+        // Destination positions based on pixel location
         const desX = w - imagedata.width / 2;
         const desY = -h + imagedata.height / 2;
         const desZ = -imagedata.width + THREE.MathUtils.randFloatSpread(20);
@@ -104,12 +103,22 @@ function drawObject() {
         destinations.push(desX, desY, desZ);
 
         // Random velocity for movement
-        let v = Math.random() / 200 + 0.015;
-
-        velocities.push(v);
+        const velocity = Math.random() / 200 + 0.015;
+        velocities.push(velocity);
       }
     }
   }
+
+  return { vertices, initialPositions, destinations, velocities };
+}
+
+/* Draw objects based on image data
+---------------------------------------------------------------*/
+function drawObject() {
+  geometry = new THREE.BufferGeometry();
+
+  // Generate particles based on image data
+  const { vertices, initialPositions, destinations, velocities } = createGeometryFromImageData(imagedata, 5);
 
   // Add extra random particles
   for (let i = 0; i < 200; i++) {
@@ -187,8 +196,8 @@ function handleMouseMove(event) {
 let animationTime = 60;
 
 setInterval(function () {
-  toogleAnimate = !toogleAnimate;
-  console.log(toogleAnimate);
+  toggleAnimate = !toggleAnimate;
+  console.log(toggleAnimate);
 }, animationTime * 1000);
 
 function animate() {
@@ -209,7 +218,7 @@ function animate() {
       v3Position.fromBufferAttribute(positions, i);
       v3Destination.fromBufferAttribute(destinations, i);
 
-      if (!toogleAnimate) {
+      if (!toggleAnimate) {
         v3Position.x += (v3Destination.x - v3Position.x) * velocities.array[i] + THREE.MathUtils.randFloatSpread(0.1);
         v3Position.y += (v3Destination.y - v3Position.y) * velocities.array[i] + THREE.MathUtils.randFloatSpread(0.1);
         v3Position.z += (v3Destination.z - v3Position.z) * velocities.array[i] + THREE.MathUtils.randFloatSpread(0.1);
@@ -266,14 +275,68 @@ function init() {
   scene.add(pointLight);
 
   // Init texture
-  texture = new THREE.TextureLoader().load(textureLink, function () {
-    imagedata = getImageData(texture.image);
-    drawObject();
-  });
+  texture = new THREE.TextureLoader().load(
+    textureLink,
+    function () {
+      imagedata = getImageData(texture.image);
+      drawObject();
+    },
+    function (err) {
+      console.error("Failed to load texture:", err);
+    }
+  );
 
   window.addEventListener("resize", handleResize, false);
   window.addEventListener("mousemove", handleMouseMove);
   window.addEventListener("touchmove", handleMouseMove);
+  // Add event listener for cleanup
+  window.addEventListener("beforeunload", cleanup);
 }
 
 init();
+
+// Clean up functions
+function cleanup() {
+  cleanupParticles();
+  cleanupScene();
+  cleanupRenderer();
+  cleanupEvents();
+}
+
+function cleanupParticles() {
+  if (particles) {
+    particles.geometry.dispose();
+    particles.material.dispose();
+    scene.remove(particles);
+    particles = null;
+  }
+}
+
+function cleanupRenderer() {
+  if (renderer) {
+    renderer.dispose();
+    renderer.forceContextLoss();
+    renderer.domElement = null;
+    renderer = null;
+  }
+}
+
+function cleanupEvents() {
+  window.removeEventListener("resize", handleResize);
+  window.removeEventListener("mousemove", handleMouseMove);
+  window.removeEventListener("touchmove", handleMouseMove);
+}
+
+function cleanupScene() {
+  scene.traverse((object) => {
+    if (object.geometry) object.geometry.dispose();
+    if (object.material) {
+      if (Array.isArray(object.material)) {
+        object.material.forEach((mat) => mat.dispose());
+      } else {
+        object.material.dispose();
+      }
+    }
+  });
+  scene.clear();
+}
