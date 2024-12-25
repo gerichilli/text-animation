@@ -1,28 +1,32 @@
+import * as THREE from "./node_modules/three/build/three.module.js";
+
 let renderer, scene, canvas, camera, sizes, particles, texture, geometry;
 let toogleAnimate = false;
 let imagedata;
 const centerVector = new THREE.Vector3(0, 0, 0);
 
-/* Canvas
+/* Canvas setup
 ---------------------------------------------------------------*/
 const bg = document.querySelector(".bg");
 canvas = document.querySelector("#canvas");
 
-/* Sizes
+/* Get canvas sizes
 ---------------------------------------------------------------*/
 sizes = {
   width: bg.getBoundingClientRect().width,
   height: bg.getBoundingClientRect().height,
 };
 
-/* Cursor
+/* Mouse tracking for interactivity
 ---------------------------------------------------------------*/
 const mouse = { x: 0, y: 0 };
 
-/* Particle Texture
+/* Particle texture size
 ---------------------------------------------------------------*/
 const textureSize = 32.0;
 
+/* Function to create a radial gradient texture
+---------------------------------------------------------------*/
 function drawRadialGradation(ctx, canvasRadius, canvasW, canvasH) {
   ctx.save();
   const gradient = ctx.createRadialGradient(canvasRadius, canvasRadius, 0, canvasRadius, canvasRadius, canvasRadius);
@@ -34,6 +38,8 @@ function drawRadialGradation(ctx, canvasRadius, canvasW, canvasH) {
   ctx.restore();
 }
 
+/* Function to generate a particle texture
+---------------------------------------------------------------*/
 function getParticleTexture() {
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
@@ -52,11 +58,11 @@ function getParticleTexture() {
   return texture;
 }
 
-/* Main Texture
+/* Main texture from provided image
 ---------------------------------------------------------------*/
 let textureLink = document.querySelector(".bg-texture").getAttribute("data-image");
 
-/* GET IMAGE DATA */
+/* Function to get image data for pixel manipulation */
 function getImageData(image) {
   const imgCanvas = document.createElement("canvas");
   imgCanvas.width = image.width;
@@ -68,10 +74,9 @@ function getImageData(image) {
   return ctx.getImageData(0, 0, image.width, image.height);
 }
 
-/* DRAW OBJECTS
+/* Draw objects based on image data
 ---------------------------------------------------------------*/
 function drawObject() {
-  // Geometry
   geometry = new THREE.BufferGeometry();
 
   const initialPositions = [];
@@ -79,10 +84,11 @@ function drawObject() {
   const destinations = [];
   const velocities = [];
 
+  // Generate particles based on image data
   for (let h = 0; h < imagedata.height; h++) {
     for (let w = 0; w < imagedata.width; w++) {
       if (imagedata.data[w * 4 + h * 4 * imagedata.width + 3] > 128) {
-        // Position / Initialposition
+        // Initial random positions
         const x = THREE.MathUtils.randFloatSpread(1000);
         const y = THREE.MathUtils.randFloatSpread(1000);
         const z = THREE.MathUtils.randFloatSpread(1000);
@@ -90,14 +96,14 @@ function drawObject() {
         vertices.push(x, y, z);
         initialPositions.push(x, y, z);
 
-        // Destination
+        // Destination positions based on image pixels
         const desX = w - imagedata.width / 2;
         const desY = -h + imagedata.height / 2;
         const desZ = -imagedata.width + THREE.MathUtils.randFloatSpread(20);
 
         destinations.push(desX, desY, desZ);
 
-        // Velocity
+        // Random velocity for movement
         let v = Math.random() / 200 + 0.015;
 
         velocities.push(v);
@@ -105,8 +111,8 @@ function drawObject() {
     }
   }
 
+  // Add extra random particles
   for (let i = 0; i < 200; i++) {
-    // Position / Initialposition
     const x = THREE.MathUtils.randFloatSpread(1000);
     const y = THREE.MathUtils.randFloatSpread(1000);
     const z = THREE.MathUtils.randFloatSpread(1000);
@@ -132,9 +138,7 @@ function drawObject() {
   geometry.setAttribute("destination", new THREE.Float32BufferAttribute(destinations, 3));
   geometry.setAttribute("velocity", new THREE.Float32BufferAttribute(velocities, 1));
 
-  console.log(geometry);
-
-  // Material
+  // Material for particles
   const material = new THREE.PointsMaterial({
     size: 5,
     color: 0xffff48,
@@ -149,8 +153,6 @@ function drawObject() {
     sizeAttenuation: true,
   });
 
-  console.log(material);
-
   particles = new THREE.Points(geometry, material);
 
   scene.add(particles);
@@ -158,7 +160,7 @@ function drawObject() {
   animate();
 }
 
-/* EVENT HANDLER
+/* Handle resizing of the viewport
 ---------------------------------------------------------------*/
 function handleResize() {
   // Update sizes
@@ -174,12 +176,13 @@ function handleResize() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 }
 
+// Handle mouse movement
 function handleMouseMove(event) {
   mouse.x = event.clientX / sizes.width - 0.5;
   mouse.y = -(event.clientY / sizes.height - 0.5);
 }
 
-/* ANIMATE
+/* Animation loop
 ---------------------------------------------------------------*/
 let animationTime = 60;
 
@@ -232,7 +235,7 @@ function animate() {
   tick();
 }
 
-/* INIT
+/* Initialization
 ---------------------------------------------------------------*/
 function init() {
   // Init renderer
@@ -268,7 +271,6 @@ function init() {
     drawObject();
   });
 
-  // Init event handlers
   window.addEventListener("resize", handleResize, false);
   window.addEventListener("mousemove", handleMouseMove);
   window.addEventListener("touchmove", handleMouseMove);
