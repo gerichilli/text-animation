@@ -289,54 +289,6 @@ function init() {
   window.addEventListener("resize", handleResize, false);
   window.addEventListener("mousemove", handleMouseMove);
   window.addEventListener("touchmove", handleMouseMove);
-  // Add event listener for cleanup
-  window.addEventListener("beforeunload", cleanup);
 }
 
 init();
-
-// Clean up functions
-function cleanup() {
-  cleanupParticles();
-  cleanupScene();
-  cleanupRenderer();
-  cleanupEvents();
-}
-
-function cleanupParticles() {
-  if (particles) {
-    particles.geometry.dispose();
-    particles.material.dispose();
-    scene.remove(particles);
-    particles = null;
-  }
-}
-
-function cleanupRenderer() {
-  if (renderer) {
-    renderer.dispose();
-    renderer.forceContextLoss();
-    renderer.domElement = null;
-    renderer = null;
-  }
-}
-
-function cleanupEvents() {
-  window.removeEventListener("resize", handleResize);
-  window.removeEventListener("mousemove", handleMouseMove);
-  window.removeEventListener("touchmove", handleMouseMove);
-}
-
-function cleanupScene() {
-  scene.traverse((object) => {
-    if (object.geometry) object.geometry.dispose();
-    if (object.material) {
-      if (Array.isArray(object.material)) {
-        object.material.forEach((mat) => mat.dispose());
-      } else {
-        object.material.dispose();
-      }
-    }
-  });
-  scene.clear();
-}
